@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SentimentIQ — Text Analyser</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080B12;
+      --surface:   #0F1320;
+      --surface2:  #161B2E;
+      --surface3:  #1E2540;
+      --border:    #252D45;
+      --text:      #E2E8F8;
+      --muted:     #5A6480;
+      --accent:    #6366F1;    /* indigo */
+      --accent-h:  #818CF8;
+      --positive:  #34D399;    /* emerald */
+      --negative:  #F87171;    /* red */
+      --neutral:   #FBBF24;    /* amber */
+      --positive-bg: rgba(52,211,153,.08);
+      --negative-bg: rgba(248,113,113,.08);
+      --neutral-bg:  rgba(251,191,36,.08);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────── */
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+
+    /* ── Header ───────────────────────────────────────────────── */
+    header {
+      padding: 40px 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 40px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo-icon {
+      width: 38px; height: 38px;
+      background: var(--accent);
+      border-radius: 10px;
+      display: grid; place-items: center;
+      font-size: 18px;
+    }
+    .logo-text {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .logo-text span { color: var(--accent-h); }
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    /* ── Input Card ───────────────────────────────────────────── */
+    .input-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 28px;
+    }
+    .input-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      padding: 16px 18px;
+      resize: vertical;
+      min-height: 140px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    textarea::placeholder { color: var(--muted); }
+    textarea:focus { border-color: var(--accent); }
+
+    .input-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 14px;
+    }
+    #char-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    #char-count.warn { color: var(--negative); }
+
+    .btn-analyse {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 11px 28px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-analyse:hover  { background: var(--accent-h); }
+    .btn-analyse:active { transform: scale(.97); }
+    .btn-analyse:disabled { opacity: .5; cursor: not-allowed; }
+
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Sample Texts ─────────────────────────────────────────── */
+    .samples {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .sample-chip {
+      font-size: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 12px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+    .sample-chip:hover { border-color: var(--accent); color: var(--text); }
+
+    /* ── Error ────────────────────────────────────────────────── */
+    .error-box {
+      background: var(--negative-bg);
+      border: 1px solid rgba(248,113,113,.3);
+      color: var(--negative);
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 14px;
+      display: none;
+      margin-bottom: 24px;
+    }
+
+    /* ── Results ──────────────────────────────────────────────── */
+    #results { display: none; animation: fadeUp .4s ease; }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(14px); }
+      to   { opacity:1; transform:translateY(0);    }
+    }
+
+    /* Verdict banner */
+    .verdict {
+      border-radius: 16px;
+      padding: 28px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      border: 1px solid transparent;
+    }
+    .verdict.positive { background:var(--positive-bg); border-color:rgba(52,211,153,.2); }
+    .verdict.negative { background:var(--negative-bg); border-color:rgba(248,113,113,.2); }
+    .verdict.neutral  { background:var(--neutral-bg);  border-color:rgba(251,191,36,.2);  }
+
+    .verdict-left { display: flex; align-items: center; gap: 18px; }
+    .verdict-emoji { font-size: 48px; line-height: 1; }
+    .verdict-label {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .verdict-word {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+    .verdict-word.positive { color: var(--positive); }
+    .verdict-word.negative { color: var(--negative); }
+    .verdict-word.neutral  { color: var(--neutral);  }
+
+    .verdict-stats {
+      display: flex;
+      gap: 28px;
+      text-align: right;
+    }
+    .vstat-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 22px;
+      font-weight: 500;
+    }
+    .vstat-lbl {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Metric cards row */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .metric-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .metric-lbl {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Gauge bars */
+    .gauges {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .gauge-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+    }
+    .gauge-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 12px;
+    }
+    .gauge-title { font-size: 13px; color: var(--muted); font-weight: 500; }
+    .gauge-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+    }
+    .gauge-track {
+      height: 8px;
+      background: var(--surface3);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .gauge-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width .8s cubic-bezier(.4,0,.2,1);
+    }
+    .gauge-fill.polarity  { background: linear-gradient(90deg, var(--negative), var(--neutral), var(--positive)); }
+    .gauge-fill.subjectivity { background: linear-gradient(90deg, var(--accent), var(--accent-h)); }
+    .gauge-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 10px;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Sentence breakdown */
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .sentences-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .sentence-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 16px;
+      align-items: center;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      transition: background .15s;
+    }
+    .sentence-row:last-child { border-bottom: none; }
+    .sentence-row:hover { background: var(--surface2); }
+    .sentence-text { font-size: 14px; line-height: 1.5; }
+    .sentence-scores {
+      display: flex;
+      gap: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .sent-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .sent-badge.positive { background:var(--positive-bg); color:var(--positive); }
+    .sent-badge.negative { background:var(--negative-bg); color:var(--negative); }
+    .sent-badge.neutral  { background:var(--neutral-bg);  color:var(--neutral);  }
+
+    /* Keywords */
+    .keywords-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      margin-bottom: 20px;
+    }
+    .keywords-wrap { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .keyword-tag {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 13px;
+      color: var(--accent-h);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .no-keywords { font-size: 13px; color: var(--muted); }
+
+    /* ── Footer ───────────────────────────────────────────────── */
+    footer {
+      margin-top: 60px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    footer span { color: var(--accent-h); }
+
+    /* ── Responsive ───────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .gauges  { grid-template-columns: 1fr; }
+      .verdict { flex-direction: column; gap: 20px; align-items: flex-start; }
+      .verdict-stats { text-align: left; }
+      header { flex-direction: column; gap: 12px; align-items: flex-start; }
+      .sentence-row { grid-template-columns: 1fr; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🔍</div>
+      <div class="logo-text">Sentiment<span>IQ</span></div>
+    </div>
+    <span class="badge">Flask + TextBlob</span>
+  </header>
+
+  <!-- Input Card -->
+  <div class="input-card">
+    <div class="input-label">Enter text to analyse</div>
+    <textarea id="text-input" placeholder="Paste a review, tweet, paragraph, or any text…" maxlength="5000"></textarea>
+    <div class="input-footer">
+      <span id="char-count">0 / 5000</span>
+      <button class="btn-analyse" id="analyse-btn" onclick="runAnalysis()">
+        <span class="spinner" id="spinner"></span>
+        <span id="btn-text">Analyse →</span>
+      </button>
+    </div>
+
+    <!-- Sample texts -->
+    <div class="samples">
+      <span style="font-size:12px;color:var(--muted);align-self:center;">Try:</span>
+      <span class="sample-chip" onclick="loadSample('positive')">😊 Positive review</span>
+      <span class="sample-chip" onclick="loadSample('negative')">😞 Negative review</span>
+      <span class="sample-chip" onclick="loadSample('neutral')">😐 News article</span>
+      <span class="sample-chip" onclick="loadSample('mixed')">🔀 Mixed opinion</span>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="error-box"></div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <!-- Verdict Banner -->
+    <div class="verdict" id="verdict">
+      <div class="verdict-left">
+        <div class="verdict-emoji" id="v-emoji"></div>
+        <div>
+          <div class="verdict-label">Overall Sentiment</div>
+          <div class="verdict-word" id="v-word"></div>
+        </div>
+      </div>
+      <div class="verdict-stats">
+        <div>
+          <div class="vstat-val" id="v-subj-label"></div>
+          <div class="vstat-lbl">Subjectivity</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Metric Cards -->
+    <div class="metrics">
+      <div class="metric-card">
+        <div class="metric-val" id="m-polarity"></div>
+        <div class="metric-lbl">Polarity Score</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val" id="m-subjectivity"></div>
+        <div class="metric-lbl">Subjectivity Score</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val" id="m-words"></div>
+        <div class="metric-lbl">Word Count</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val" id="m-sentences"></div>
+        <div class="metric-lbl">Sentences</div>
+      </div>
+    </div>
+
+    <!-- Gauge Bars -->
+    <div class="gauges">
+      <div class="gauge-card">
+        <div class="gauge-header">
+          <span class="gauge-title">Polarity</span>
+          <span class="gauge-value" id="g-polarity-val"></span>
+        </div>
+        <div class="gauge-track">
+          <div class="gauge-fill polarity" id="g-polarity-bar" style="width:50%"></div>
+        </div>
+        <div class="gauge-labels"><span>-1 Negative</span><span>0</span><span>+1 Positive</span></div>
+      </div>
+      <div class="gauge-card">
+        <div class="gauge-header">
+          <span class="gauge-title">Subjectivity</span>
+          <span class="gauge-value" id="g-subj-val"></span>
+        </div>
+        <div class="gauge-track">
+          <div class="gauge-fill subjectivity" id="g-subj-bar" style="width:0%"></div>
+        </div>
+        <div class="gauge-labels"><span>0 Objective</span><span>0.5</span><span>1 Subjective</span></div>
+      </div>
+    </div>
+
+    <!-- Keywords -->
+    <div class="section-title">Detected Keywords</div>
+    <div class="keywords-card">
+      <div class="keywords-wrap" id="keywords-wrap"></div>
+    </div>
+
+    <!-- Sentence Breakdown -->
+    <div class="section-title">Sentence-by-Sentence Breakdown</div>
+    <div class="sentences-card" id="sentences-list"></div>
+
+  </div><!-- /results -->
+
+  <footer>
+    Built with <span>Flask</span> + <span>TextBlob</span> · Slab 2 Intermediate Project
+  </footer>
+
+</div><!-- /page -->
+
+<script>
+  const SAMPLES = {
+    positive: "I absolutely loved this product! The quality is outstanding and it arrived earlier than expected. The customer service team was incredibly helpful and friendly. I would definitely recommend this to all my friends and family. Best purchase I've made this year!",
+    negative: "This was a terrible experience from start to finish. The product broke after just two days of use. Customer support was completely unhelpful and rude. I wasted my money and now I'm stuck with a useless item. I will never buy from this company again.",
+    neutral:  "The company announced its quarterly earnings report on Thursday. Revenue increased by 3.2 percent compared to the same period last year. The CEO stated that the firm plans to expand into three new markets over the coming fiscal year. No significant changes to staffing were announced.",
+    mixed:    "The food at this restaurant was absolutely delicious and the presentation was beautiful. However, the service was painfully slow and the prices are quite steep for what you get. The atmosphere is cozy, but the parking situation nearby is a nightmare. I might come back for special occasions only."
+  };
+
+  const textarea = document.getElementById('text-input');
+
+  textarea.addEventListener('input', () => {
+    const n = textarea.value.length;
+    const el = document.getElementById('char-count');
+    el.textContent = `${n} / 5000`;
+    el.classList.toggle('warn', n > 4500);
+  });
+
+  function loadSample(key) {
+    textarea.value = SAMPLES[key];
+    textarea.dispatchEvent(new Event('input'));
+    textarea.focus();
+  }
+
+  async function runAnalysis() {
+    const text = textarea.value.trim();
+    if (!text) { showError("Please enter some text to analyse."); return; }
+
+    setLoading(true);
+    hideError();
+    document.getElementById('results').style.display = 'none';
+
+    try {
+      const res  = await fetch('/analyse', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ text })
+      });
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || "Analysis failed."); return; }
+      renderResults(data);
+    } catch(e) {
+      showError("Network error. Make sure the Flask server is running.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function renderResults(d) {
+    // Verdict
+    const verdict = document.getElementById('verdict');
+    verdict.className = `verdict ${d.sentiment_css}`;
+    document.getElementById('v-emoji').textContent = d.sentiment_emoji;
+    const vWord = document.getElementById('v-word');
+    vWord.textContent  = d.sentiment;
+    vWord.className    = `verdict-word ${d.sentiment_css}`;
+    document.getElementById('v-subj-label').textContent = d.subjectivity_label;
+
+    // Metrics
+    document.getElementById('m-polarity').textContent    = d.polarity.toFixed(3);
+    document.getElementById('m-subjectivity').textContent= d.subjectivity.toFixed(3);
+    document.getElementById('m-words').textContent       = d.word_count;
+    document.getElementById('m-sentences').textContent   = d.sentence_count;
+
+    // Gauges
+    const polarPct = ((d.polarity + 1) / 2 * 100).toFixed(1);
+    document.getElementById('g-polarity-bar').style.width  = polarPct + '%';
+    document.getElementById('g-polarity-val').textContent  = d.polarity.toFixed(3);
+    document.getElementById('g-subj-bar').style.width      = (d.subjectivity*100).toFixed(1) + '%';
+    document.getElementById('g-subj-val').textContent      = d.subjectivity.toFixed(3);
+
+    // Keywords
+    const kw = document.getElementById('keywords-wrap');
+    kw.innerHTML = d.keywords.length
+      ? d.keywords.map(k=>`<span class="keyword-tag">${k}</span>`).join('')
+      : '<span class="no-keywords">No key phrases detected.</span>';
+
+    // Sentences
+    const sl = document.getElementById('sentences-list');
+    sl.innerHTML = d.sentences.map(s => `
+      <div class="sentence-row">
+        <div class="sentence-text">${escHtml(s.text)}</div>
+        <div class="sentence-scores">
+          <span title="Polarity">P: ${s.polarity.toFixed(2)}</span>
+          <span title="Subjectivity">S: ${s.subjectivity.toFixed(2)}</span>
+        </div>
+        <span class="sent-badge ${s.css}">${s.sentiment}</span>
+      </div>`).join('');
+
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('results').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  function setLoading(on) {
+    document.getElementById('spinner').style.display  = on ? 'block' : 'none';
+    document.getElementById('btn-text').textContent   = on ? 'Analysing…' : 'Analyse →';
+    document.getElementById('analyse-btn').disabled   = on;
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-box');
+    el.textContent    = msg;
+    el.style.display  = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('error-box').style.display = 'none';
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Allow Ctrl+Enter to submit
+  textarea.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.ctrlKey) runAnalysis();
+  });
+</script>
+</body>
+</html>
